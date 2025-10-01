@@ -1,8 +1,10 @@
 import sys
+import os
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                             QTextEdit, QLineEdit, QLabel, QComboBox, QMessageBox)
+                             QTextEdit, QLineEdit, QLabel, QComboBox, QMessageBox,
+                             QListWidget, QListWidgetItem, QFileDialog, QSplitter, QInputDialog)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor
 from openai import OpenAI
 import re
 
@@ -231,3 +233,211 @@ class KnowledgeBaseChatUI(QWidget):
         self.chat_display.clear()
         self.conversation_history.clear()
         self.add_system_message("对话记录已清空")
+
+
+class KnowledgeManagementUI(QWidget):
+    """知识管理界面类"""
+    
+    def __init__(self, knowledge_base_path="/Users/younger/Desktop/yw/myKB"):
+        super().__init__()
+        self.knowledge_base_path = knowledge_base_path
+        self.init_ui()
+
+    def init_ui(self):
+        """初始化用户界面"""
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)  # 移除所有边距
+        layout.setSpacing(0)  # 移除所有间距
+        
+        # 目录选择区域 - 从媒体文件管理界面添加
+        dir_layout = QHBoxLayout()
+        dir_layout.setContentsMargins(0, 0, 0, 0)
+        dir_layout.setSpacing(5)
+        
+        self.dir_label = QLabel(f"当前目录: {self.knowledge_base_path}")
+        self.dir_label.setFont(QFont("Arial", 10))
+        dir_layout.addWidget(self.dir_label)
+        
+        self.select_dir_btn = QPushButton("选择目录")
+        self.select_dir_btn.setFont(QFont("Arial", 10))
+        self.select_dir_btn.setFixedHeight(25)
+        self.select_dir_btn.clicked.connect(self.select_directory)
+        dir_layout.addWidget(self.select_dir_btn)
+        
+        dir_layout.addStretch()
+        layout.addLayout(dir_layout)
+        
+        # 操作按钮区域 - 最小化布局
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)  # 移除所有边距
+        button_layout.setSpacing(5)  # 最小间距
+        
+        self.refresh_btn = QPushButton("刷新")
+        self.refresh_btn.setFont(QFont("Arial", 10))
+        self.refresh_btn.setFixedHeight(25)  # 固定按钮高度
+        self.refresh_btn.clicked.connect(self.refresh_file_list)
+        button_layout.addWidget(self.refresh_btn)
+
+        self.open_btn = QPushButton("打开文件")
+        self.open_btn.setFont(QFont("Arial", 10))
+        self.open_btn.setFixedHeight(25)
+        self.open_btn.clicked.connect(self.open_file)
+        button_layout.addWidget(self.open_btn)
+
+        self.delete_btn = QPushButton("删除文件")
+        self.delete_btn.setFont(QFont("Arial", 10))
+        self.delete_btn.setFixedHeight(25)
+        self.delete_btn.clicked.connect(self.delete_file)
+        button_layout.addWidget(self.delete_btn)
+
+        self.new_file_btn = QPushButton("新建文件")
+        self.new_file_btn.setFont(QFont("Arial", 10))
+        self.new_file_btn.setFixedHeight(25)
+        self.new_file_btn.clicked.connect(self.new_file)
+        button_layout.addWidget(self.new_file_btn)
+
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+        
+        # 文件列表区域 - 占据主要空间
+        file_list_label = QLabel("知识文件列表:")
+        file_list_label.setFont(QFont("Arial", 11))
+        layout.addWidget(file_list_label)
+        
+        self.file_list = QListWidget()
+        self.file_list.setFont(QFont("Arial", 13))
+        self.file_list.itemClicked.connect(self.on_file_selected)
+        self.file_list.itemDoubleClicked.connect(self.open_file)
+        layout.addWidget(self.file_list)
+        
+        self.setLayout(layout)
+        
+        # 设置窗口大小
+        self.resize(1200, 800)
+        
+        # 初始加载文件列表
+        self.refresh_file_list()
+
+    def refresh_file_list(self):
+        """刷新文件列表 - 显示层级目录结构"""
+        self.file_list.clear()
+        
+        if not os.path.exists(self.knowledge_base_path):
+            QMessageBox.warning(self, "警告", f"知识库路径不存在: {self.knowledge_base_path}")
+            return
+        
+        try:
+            # 获取目录下所有文件（包括子目录）
+            files = []
+            for root, dirs, filenames in os.walk(self.knowledge_base_path):
+                # 计算缩进级别
+                level = root.replace(self.knowledge_base_path, '').count(os.sep)
+                indent = "    " * level
+                
+                # 添加目录项（如果当前目录不是根目录）
+                if level > 0:
+                    dir_name = os.path.basename(root)
+                    dir_item = QListWidgetItem(f"{indent}📁 {dir_name}/")
+                    dir_item.setData(Qt.UserRole, os.path.relpath(root, self.knowledge_base_path))
+                    dir_item.setFlags(dir_item.flags() & ~Qt.ItemIsSelectable)  # 目录不可选择
+                    dir_item.setForeground(QColor("#1a73e8"))
+                    dir_item.setFont(QFont("Arial", 13, QFont.Bold))
+                    self.file_list.addItem(dir_item)
+                
+                # 添加文件项
+                for filename in filenames:
+                    file_item = QListWidgetItem(f"{indent}    📄 {filename}")
+                    rel_path = os.path.relpath(os.path.join(root, filename), self.knowledge_base_path)
+                    file_item.setData(Qt.UserRole, rel_path)
+                    file_item.setFont(QFont("Arial", 13))
+                    self.file_list.addItem(file_item)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"读取文件列表失败: {str(e)}")
+
+    def on_file_selected(self, item):
+        """文件被选中时的处理"""
+        # 检查是否为目录项（不可选择）
+        if not (item.flags() & Qt.ItemIsSelectable):
+            return
+            
+        # 获取存储在UserRole中的实际文件路径
+        file_path = item.data(Qt.UserRole)
+        if file_path:
+            self.current_selected_file = file_path
+
+    def open_file(self):
+        """打开选中的文件"""
+        if not hasattr(self, 'current_selected_file'):
+            QMessageBox.information(self, "提示", "请先选择一个文件")
+            return
+        
+        file_path = os.path.join(self.knowledge_base_path, self.current_selected_file)
+        
+        try:
+            # 在系统默认应用中打开文件
+            if sys.platform == "win32":
+                os.startfile(file_path)
+            elif sys.platform == "darwin":  # macOS
+                os.system(f"open '{file_path}'")
+            else:  # linux
+                os.system(f"xdg-open '{file_path}'")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"打开文件失败: {str(e)}")
+
+    def delete_file(self):
+        """删除选中的文件"""
+        if not hasattr(self, 'current_selected_file'):
+            QMessageBox.information(self, "提示", "请先选择一个文件")
+            return
+        
+        file_path = os.path.join(self.knowledge_base_path, self.current_selected_file)
+        
+        reply = QMessageBox.question(self, "确认删除", 
+                                    f"确定要删除文件 '{self.current_selected_file}' 吗？",
+                                    QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                os.remove(file_path)
+                QMessageBox.information(self, "成功", "文件删除成功")
+                self.refresh_file_list()
+                self.content_display.clear()
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"删除文件失败: {str(e)}")
+
+    def new_file(self):
+        """创建新文件"""
+        file_name, ok = QInputDialog.getText(self, "新建文件", "请输入文件名（可包含子目录路径）:")
+        
+        if ok and file_name:
+            # 确保文件名有扩展名
+            if '.' not in os.path.basename(file_name):
+                file_name += ".txt"
+            
+            file_path = os.path.join(self.knowledge_base_path, file_name)
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            if os.path.exists(file_path):
+                QMessageBox.warning(self, "警告", "文件已存在")
+                return
+            
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write("# 新文件\n\n请在此处输入内容...")
+                
+                QMessageBox.information(self, "成功", "文件创建成功")
+                self.refresh_file_list()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"创建文件失败: {str(e)}")
+
+    def select_directory(self):
+        """选择目录"""
+        directory = QFileDialog.getExistingDirectory(self, "选择知识库目录", self.knowledge_base_path)
+        if directory:
+            self.knowledge_base_path = directory
+            self.dir_label.setText(f"当前目录: {self.knowledge_base_path}")
+            self.refresh_file_list()

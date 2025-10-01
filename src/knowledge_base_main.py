@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import Qt
 from media_manager_ui import MediaManagerUI
 
-from src.knowledge_chat_ui import KnowledgeBaseChatUI
+from src.knowledge_chat_ui import KnowledgeBaseChatUI, KnowledgeManagementUI
 
 
 class KnowledgeBaseMain(QMainWindow):
@@ -36,27 +36,36 @@ class KnowledgeBaseMain(QMainWindow):
         self.media_btn = QPushButton("媒体文件管理")
         self.media_btn.setStyleSheet("font-size: 14px; padding: 8px; background-color: #e3f2fd;")
         self.media_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-        
+
+        self.km_btn = QPushButton("知识管理")
+        self.km_btn.setStyleSheet("font-size: 14px; padding: 8px; background-color: #e8f5e8;")
+        self.km_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
+
         self.kb_btn = QPushButton("知识库对话")
         self.kb_btn.setStyleSheet("font-size: 14px; padding: 8px; background-color: #f3e5f5;")
-        self.kb_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        
+        self.kb_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(2))
+
         nav_layout.addWidget(self.media_btn)
+        nav_layout.addWidget(self.km_btn)
         nav_layout.addWidget(self.kb_btn)
         nav_layout.addStretch()
         layout.addLayout(nav_layout)
 
-        # 堆叠布局 - 包含两个功能页面
+        # 堆叠布局 - 包含三个功能页面
         self.stacked_widget = QStackedWidget()
         
         # 页面1: 媒体文件管理
         self.media_page = MediaManagerUI()
         self.stacked_widget.addWidget(self.media_page)
         
-        # 页面2: 知识库对话
+        # 页面2: 知识管理
+        self.km_page = KnowledgeManagementUI()
+        self.stacked_widget.addWidget(self.km_page)
+
+        # 页面3: 知识库对话
         self.chat_page = KnowledgeBaseChatUI()
         self.stacked_widget.addWidget(self.chat_page)
-        
+
         layout.addWidget(self.stacked_widget)
         central_widget.setLayout(layout)
 
